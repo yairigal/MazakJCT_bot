@@ -351,9 +351,7 @@ def main():
     # Start the Bot
     #updater.start_polling()
     updater.start_webhook(listen='127.0.0.1', port=5000, url_path='bots/'+TOKEN)
-    updater.bot.set_webhook(webhook_url='https://nmontag.com/bots/'+TOKEN,
-                             certificate=open('/etc/letsencrypt/live/nmontag.com/fullchain.pem', 'rb'))
-
+    updater.bot.set_webhook(url='https://nmontag.com/bots/' + TOKEN)
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
