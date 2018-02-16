@@ -118,7 +118,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-TOKEN = open("token","r+").read()
+with open("token","r+") as token:
+    TOKEN = token.read()
 
 BACK, USERNAME, PASSWORD, CHOOSING, GRADES, AVGS, EXAM_CERTIFICATE, NOTEBOOKS = range(8)
 
