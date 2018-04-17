@@ -39,21 +39,73 @@ def get_grade(session, course_id):
     return data
 
 
+def get_all_protecting_grades(grade):
+    return [part for part in grade["partGrades"] if part["minGrade"] == 0]
+
+
+def calc_grade_without_prot_parts(grade):
+    final_grade = 0.0
+    final_weight = 0.0
+    for part in grade["partGrades"]:
+        if part["minGrade"] != 0:  # not protection part
+            part_grade = 0
+            try:
+                if part["gradeCName"] is not None:
+                    part_grade = float(part["gradeCName"])
+                elif part["gradeSpecialName"] is not None:
+                    part_grade = float(part["gradeSpecialName"])
+                elif part["gradeBName"] is not None:
+                    part_grade = float(part["gradeBName"])
+                elif part["gradeAName"] is not None:
+                    part_grade = float(part["gradeAName"])
+            except:
+                part_grade = 0
+            if part_grade == 0:
+                return "חסר"
+            final_grade += (float(part["weight"]) / 100) * part_grade
+            final_weight += float(part["weight"])
+    if final_grade != 0:
+        return int(final_grade + 0.5 + 100 - final_weight)
+    return "חסר"
+
+
+def calc_final_grade_protection(grade):
+    prot_parts = get_all_protecting_grades(grade)
+    final_grade_parts = grade["partGrades"]
+    grade_without_parts = calc_grade_without_prot_parts(grade)
+    for prot_part in prot_parts:
+        try:
+            if prot_part["gradeCName"] is not None:
+                part_grade = float(prot_part["gradeCName"])
+            elif prot_part["gradeSpecialName"] is not None:
+                part_grade = float(prot_part["gradeSpecialName"])
+            elif prot_part["gradeBName"] is not None:
+                part_grade = float(prot_part["gradeBName"])
+            elif prot_part["gradeAName"] is not None:
+                part_grade = float(prot_part["gradeAName"])
+        except:
+            part_grade = 0
+        if part_grade <= grade_without_parts:
+            final_grade_parts.remove(part_grade)
+    grade["partGrades"] = final_grade_parts
+    return calc_final_grade(grade)
+
+
 def calc_final_grade(grade):
     final_grade = 0.0
     for part in grade["partGrades"]:
         part_grade = 0
-        if part["gradeCName"] is not None:
-            part_grade = float(part["gradeCName"])
-        elif part["gradeSpecialName"] is not None:
-            part_grade = float(part["gradeSpecialName"])
-        elif part["gradeBName"] is not None:
-            part_grade = float(part["gradeBName"])
-        elif part["gradeAName"] is not None:
-            try:
+        try:
+            if part["gradeCName"] is not None:
+                part_grade = float(part["gradeCName"])
+            elif part["gradeSpecialName"] is not None:
+                part_grade = float(part["gradeSpecialName"])
+            elif part["gradeBName"] is not None:
+                part_grade = float(part["gradeBName"])
+            elif part["gradeAName"] is not None:
                 part_grade = float(part["gradeAName"])
-            except:
-                part_grade = 0
+        except:
+            part_grade = 0
         if part_grade == 0:
             return "חסר"
         final_grade += (float(part["weight"]) / 100) * part_grade
@@ -82,7 +134,6 @@ def grade_to_string(grade):
 {}
 משקל : {}
         """.format(part["gradePartTypeName"], grade_string, part["weight"]))
-    output_text.append("ציון סופי : {}".format(calc_final_grade(grade)))
     return output_text
 
 
@@ -172,10 +223,31 @@ def get_notebook(session, notebook_id):
     return out
 
 
+def get_departments(session):
+    link = "/api/student/certificates.ashx?action=LoadDataForGradesSheet"
+    r = session.post(base_url + link)
+    data = json.loads(r.text)
+    return data["departments"]
+
+
+def get_grade_sheet(session, dept_id, lang):
+    r = session.get(
+        base_url + "/api/student/certificates.ashx?action=DownloadGradesSheet&selectedLanguage={}&showMore=true&selectedDepartment={}".format(
+            lang, dept_id),
+        stream=True)
+    out = bytes()
+    for block in r.iter_content(1024):
+        out += block
+    return out
+
+
 if __name__ == '__main__':
-    s = log_to_mazak("******", "******")
+    with open("pass", "r+") as f:
+        un = f.readline().rstrip('\n')
+        pw = f.readline().rstrip('\n')
+    s = log_to_mazak(un, pw)
     # x = get_notebook(s,269276)
-    grade = get_grade(s, 24728)
-    print(calc_final_grade(grade))
+    grade = get_grade(s, 23492)
+    print(calc_final_grade_protection(grade))
     for text in grade_to_string(grade):
         print(text)
