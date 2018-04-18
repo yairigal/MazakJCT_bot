@@ -60,7 +60,10 @@ def update_contacts(update):
             cts.write("{}")
     with open("contacts", "r+") as cts:
         contacts = json.load(cts)
-    contacts[update.message.from_user.id] = update.message.from_user.full_name
+    user_id = update.message.from_user.id
+    firstname = update.message.from_user.first_name
+    lastname = update.message.from_user.last_name
+    contacts[str(user_id)] = "{} {}".format(firstname, lastname)
     with open("contacts", "w+") as cts:
         json.dump(contacts, cts)
 
@@ -325,7 +328,7 @@ def main():
     dp.add_error_handler(error)
 
     # Start the Bot
-    #polling(updater)
+    # polling(updater)
     webhook(updater)
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
