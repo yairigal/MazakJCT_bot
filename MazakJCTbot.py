@@ -1,3 +1,4 @@
+import os
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler)
@@ -54,8 +55,9 @@ def start(bot, update):
 
 
 def update_contacts(update):
-    with open("contacts", "w+") as cts:
-        pass
+    if not os.path.exists("contacts"):
+        with open("contacts", "w+") as cts:
+            cts.write("{}")
     with open("contacts", "r+") as cts:
         contacts = json.load(cts)
     contacts[update.message.from_user.id] = update.message.from_user.full_name
@@ -323,7 +325,7 @@ def main():
     dp.add_error_handler(error)
 
     # Start the Bot
-    # polling(updater)
+    #polling(updater)
     webhook(updater)
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
@@ -336,7 +338,7 @@ def polling(updater):
 
 
 def webhook(updater):
-    updater.start_webhook(listen='127.0.0.1', port=5000, url_path='bots/' + TOKEN)
+    updater.start_webhook(listen='127.0.0.1', port=5003, url_path='bots/' + TOKEN)
     updater.bot.set_webhook(url='https://nmontag.com/bots/' + TOKEN)
 
 
