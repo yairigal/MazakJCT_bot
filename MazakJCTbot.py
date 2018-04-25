@@ -293,7 +293,10 @@ def send_restart(updater):
     with open("contacts", 'r') as f:
         ppl = json.load(f)
     for id in ppl.keys():
-        updater.bot.sendMessage(int(id), restart_msg)
+        try:
+            updater.bot.sendMessage(int(id), restart_msg)
+        except:
+            pass
 
 
 def main():
@@ -338,7 +341,7 @@ def main():
 
     send_restart(updater)
     # Start the Bot
-    #polling(updater)
+    # polling(updater)
     webhook(updater)
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
