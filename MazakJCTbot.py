@@ -72,7 +72,8 @@ def username(bot, update, user_data):
     user = update.message.from_user
     user_data["username"] = update.message.text
     logger.info("%s entered username", user.first_name)
-    update.message.reply_text('אנא הכנס\י סיסמא של המזק')
+    update.message.reply_text(
+        'אנא הכנס\י סיסמא של המזק (האחריות על הסיסמא היא רק בידי המשתמש \n אנחנו לא אחראים על בטיחות המידע)')
     return PASSWORD
 
 
@@ -287,6 +288,14 @@ def error(bot, update, error):
     logger.warning('Update "%s" caused error "%s"', update, error)
 
 
+def send_restart(updater):
+    restart_msg = "היי !    \nחזרנו לעבוד אנא שלח /start כדי להתחיל !"
+    with open("contacts", 'r') as f:
+        ppl = json.load(f)
+    for id in ppl.keys():
+        updater.bot.sendMessage(int(id), restart_msg)
+
+
 def main():
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(TOKEN)
@@ -327,6 +336,7 @@ def main():
     # log all errors
     dp.add_error_handler(error)
 
+    send_restart(updater)
     # Start the Bot
     # polling(updater)
     webhook(updater)
