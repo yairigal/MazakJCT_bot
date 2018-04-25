@@ -155,7 +155,7 @@ def avereges_to_string(avg):
     allAvg = datadict["graduateCumulativeAverage"]
     allNz = datadict["graduateCumulativeCredits"]
     m = parse(datadict["calcDate"])
-    calcDate = str(m).replace("+02:00", "")
+    calcDate = str(m).replace("+02:00", "").replace("+03:00","")
     total = """
     ממוצע אקדמי : {}
     נ''ז אקדמיות : {}
@@ -174,7 +174,7 @@ def avereges_to_string(avg):
         yr = year["academicYearName"]
         avg = year["average"]
         nz = year["accumulatedCredits"]
-        date = str(parse(year["calculatedOn"])).replace("+02:00", "")
+        date = str(parse(year["calculatedOn"])).replace("+02:00", "").replace("+03:00","")
         output = """
         שנה אקדמית : {}
         ממוצע אקדמי : {}

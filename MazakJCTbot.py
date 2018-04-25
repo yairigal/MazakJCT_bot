@@ -73,7 +73,7 @@ def username(bot, update, user_data):
     user_data["username"] = update.message.text
     logger.info("%s entered username", user.first_name)
     update.message.reply_text(
-        'אנא הכנס\י סיסמא של המזק (האחריות על הסיסמא היא רק בידי המשתמש \n אנחנו לא אחראים על בטיחות המידע)')
+        'אנא הכנס\י סיסמא של המזק:\n(האחריות על הסיסמא היא רק בידי המשתמש אנחנו לא אחראים על בטיחות המידע)')
     return PASSWORD
 
 
@@ -338,7 +338,7 @@ def main():
 
     send_restart(updater)
     # Start the Bot
-    # polling(updater)
+    #polling(updater)
     webhook(updater)
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
