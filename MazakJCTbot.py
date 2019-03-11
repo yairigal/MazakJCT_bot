@@ -1,18 +1,29 @@
+import io
 import os
-from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
-                          ConversationHandler)
+import json
+import logging
+from functools import wraps
+from datetime import datetime
+
+from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove, ChatAction)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, ConversationHandler)
 
 import MazakFiles
-from MazakFiles import LoginErrorExcpetion, log_to_mazak, get_grades, get_avereges, avereges_to_string, \
-    get_test_confirmations, BlockedStudent, get_available_notebooks, get_notebook, get_grade, get_departments, \
-    get_grade_sheet
-import logging
-import io
-from datetime import datetime
-import json
+from MazakFiles import (LoginErrorExcpetion,
+                        log_to_mazak,
+                        get_grades,
+                        get_avereges,
+                        avereges_to_string,
+                        get_test_confirmations,
+                        BlockedStudent,
+                        get_available_notebooks,
+                        get_notebook,
+                        get_grade,
+                        get_departments,
+                        get_grade_sheet)
 
-log_file = "log"
+POLLING = True  # Connecting to telegram using polling if true or webhook if false
+LOG_FILE = "log"
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -20,13 +31,23 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
+# Read token
 with open("token", "r+") as token:
     TOKEN = token.read().strip('\n')
 
-BACK, USERNAME, PASSWORD, CHOOSING, GRADES, AVGS, EXAM_CERTIFICATE, NOTEBOOKS, GRADES_SHEET_CHOOSE_DEP, GRADES_SHEET = range(
-    10)
+# Enum initialization
+(BACK,
+ USERNAME,
+ PASSWORD,
+ CHOOSING,
+ GRADES,
+ AVGS,
+ EXAM_CERTIFICATE,
+ NOTEBOOKS,
+ GRADES_SHEET_CHOOSE_DEP,
+ GRADES_SHEET) = range(10)
 
-choosing_options = {
+CHOOSING_OPTIONS = {
     BACK: "התנתק ❌",
     GRADES: "ציונים 💯",
     AVGS: "ממוצעים 📈",
@@ -35,17 +56,21 @@ choosing_options = {
     GRADES_SHEET: "גליון ציונים 📜"
 }
 
-move_back = "חזור 🔙"
+MOVE_BACK = "חזור 🔙"
 
 
-def start2(bot, update):
-    reply_keyboard = [['Boy', 'Girl', 'Other']]
+def apply_action(action):
+    def send_action(func):
+        """Sends typing action while processing func command."""
 
-    update.message.reply_text(
-        'Hi Please Enter The Username for the mazak:',
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+        @wraps(func)
+        def command_func(bot, update, *args, **kwargs):
+            bot.send_chat_action(chat_id=update.effective_message.chat_id, action=action)
+            return func(bot, update, *args, **kwargs)
 
-    return USERNAME
+        return command_func
+
+    return send_action
 
 
 def start(bot, update):
@@ -100,25 +125,25 @@ def choosing(bot, update, user_data):
     user = update.message.from_user
     option = update.message.text
     logger.info("%s choosed %s", user.first_name, option)
-    if option == choosing_options[AVGS]:
-        avgs(update, user_data)
+    if option == CHOOSING_OPTIONS[AVGS]:
+        avgs(bot, update, user_data)
         return CHOOSING
-    elif option == choosing_options[GRADES]:
+    elif option == CHOOSING_OPTIONS[GRADES]:
         user_data["grades"] = get_grades(log_to_mazak(user_data["username"], user_data["password"]))[::-1]
         reply_keyboard = get_grades_keyboard(user_data)
         update.message.reply_text("אנא בחר\י קורס",
                                   reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
         return GRADES
-    elif option == choosing_options[EXAM_CERTIFICATE]:
-        send_confirms_files(update, user_data)
-    elif option == choosing_options[NOTEBOOKS]:
+    elif option == CHOOSING_OPTIONS[EXAM_CERTIFICATE]:
+        send_confirms_files(bot, update, user_data)
+    elif option == CHOOSING_OPTIONS[NOTEBOOKS]:
         user_data["notebooks"] = get_available_notebooks(log_to_mazak(user_data["username"], user_data["password"]))[
                                  ::-1]
         reply_keyboard = get_notebooks_keyboard(user_data)
         update.message.reply_text("אנא בחר\י מחברת",
                                   reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
         return NOTEBOOKS
-    elif option == choosing_options[GRADES_SHEET]:
+    elif option == CHOOSING_OPTIONS[GRADES_SHEET]:
         user_data["dept"] = get_departments(log_to_mazak(user_data["username"], user_data["password"]))
         if len(user_data["dept"]) > 1:
             reply_keyboard = [[d["name"]] for d in user_data["dept"]]
@@ -160,7 +185,9 @@ def grades_sheet(bot, update, user_data):
         lang = 0
         lang_name = "גליון ציונים"
     filename = "{} - {}.pdf".format(lang_name, str(datetime.today()).split()[0])
-    update.message.reply_text("מוריד...", reply_markup=ReplyKeyboardRemove())
+    bot.send_chat_action(chat_id=update.effective_message.chat_id,
+                         action=ChatAction.UPLOAD_DOCUMENT,
+                         timeout=60)
     notebook_file = io.BytesIO(
         get_grade_sheet(log_to_mazak(user_data["username"], user_data["password"]), user_data["dept_code"], lang))
     update.message.reply_document(notebook_file, filename=filename, timeout=200,
@@ -170,14 +197,14 @@ def grades_sheet(bot, update, user_data):
 
 
 def get_notebooks_keyboard(user_data):
-    reply_keyboard = [[move_back]]
+    reply_keyboard = [[MOVE_BACK]]
     reply_keyboard += [["{} - {}".format(item["courseName"], item["testTimeTypeName"])] for item in
                        user_data["notebooks"]]
     return reply_keyboard
 
 
 def get_grades_keyboard(user_data):
-    reply_keyboard = [[move_back]]
+    reply_keyboard = [[MOVE_BACK]]
     reply_keyboard += [[item["courseName"] + " " + item["actualCourseFullNumber"]] for item in user_data["grades"]]
     return reply_keyboard
 
@@ -185,14 +212,16 @@ def get_grades_keyboard(user_data):
 def notebooks(bot, update, user_data):
     user = update.message.from_user
     course = update.message.text
-    if course == move_back:
+    if course == MOVE_BACK:
         popup_choosing_keyboard(update, get_choosing_keyboard())
         return CHOOSING
     logger.info("%s selected notebook %s", user.first_name, course)
     notebook = [item for item in user_data["notebooks"] if
                 "{} - {}".format(item["courseName"], item["testTimeTypeName"]) == course][0]
     filename = "{} - {}".format(notebook["courseName"], notebook["testTimeTypeName"]) + ".pdf"
-    update.message.reply_text("מוריד את המחברת..", reply_markup=ReplyKeyboardRemove())
+    bot.send_chat_action(chat_id=update.effective_message.chat_id,
+                         action=ChatAction.UPLOAD_DOCUMENT,
+                         timeout=60)
     notebook_file = io.BytesIO(get_notebook(log_to_mazak(user_data["username"], user_data["password"]), notebook["id"]))
     update.message.reply_document(notebook_file, filename=filename, timeout=200,
                                   reply_markup=ReplyKeyboardMarkup(get_notebooks_keyboard(user_data),
@@ -200,7 +229,8 @@ def notebooks(bot, update, user_data):
     return NOTEBOOKS
 
 
-def avgs(update, user_data):
+@apply_action(ChatAction.TYPING)
+def avgs(bot, update, user_data):
     reslt = avereges_to_string(get_avereges(log_to_mazak(user_data["username"], user_data["password"])))
     for item in reslt:
         update.message.reply_text(item)
@@ -209,8 +239,10 @@ def avgs(update, user_data):
     return CHOOSING
 
 
-def send_confirms_files(update, user_data):
-    update.message.reply_text("מוריד את הקבצים...")
+def send_confirms_files(bot, update, user_data):
+    bot.send_chat_action(chat_id=update.effective_message.chat_id,
+                         action=ChatAction.UPLOAD_DOCUMENT,
+                         timeout=60)
     try:
         reslt = get_test_confirmations(log_to_mazak(user_data["username"], user_data["password"]))
     except Exception as e:
@@ -225,10 +257,11 @@ def send_confirms_files(update, user_data):
     return CHOOSING
 
 
+@apply_action(ChatAction.TYPING)
 def grades(bot, update, user_data):
     user = update.message.from_user
     course = update.message.text
-    if course == move_back:
+    if course == MOVE_BACK:
         popup_choosing_keyboard(update, get_choosing_keyboard())
         return CHOOSING
     logger.info("%s selected grade %s", user.first_name, course)
@@ -258,10 +291,10 @@ def popup_choosing_keyboard(update, keyboard):
 
 def get_choosing_keyboard():
     reply_keyboard = [
-        [choosing_options[GRADES], choosing_options[AVGS], choosing_options[EXAM_CERTIFICATE],
-         choosing_options[NOTEBOOKS]],
-        [choosing_options[GRADES_SHEET],
-         choosing_options[BACK]]
+        [CHOOSING_OPTIONS[GRADES], CHOOSING_OPTIONS[AVGS], CHOOSING_OPTIONS[EXAM_CERTIFICATE],
+         CHOOSING_OPTIONS[NOTEBOOKS]],
+        [CHOOSING_OPTIONS[GRADES_SHEET],
+         CHOOSING_OPTIONS[BACK]]
     ]
     return reply_keyboard
 
@@ -341,8 +374,10 @@ def main():
 
     send_restart(updater)
     # Start the Bot
-    # polling(updater)
-    webhook(updater)
+    if POLLING:
+        polling(updater)
+    else:
+        webhook(updater)
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
