@@ -22,7 +22,7 @@ from MazakFiles import (LoginErrorExcpetion,
                         get_departments,
                         get_grade_sheet)
 
-POLLING = True  # Connecting to telegram using polling if true or webhook if false
+POLLING = False  # Connecting to telegram using polling if true or webhook if false
 LOG_FILE = "log"
 
 # Enable logging
