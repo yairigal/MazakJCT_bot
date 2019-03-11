@@ -2,11 +2,13 @@ import io
 import os
 import json
 import logging
+import threading
 from functools import wraps
 from datetime import datetime
+from time import sleep
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove, ChatAction)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, ConversationHandler)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, run_async)
 
 import MazakFiles
 from MazakFiles import (LoginErrorExcpetion,
@@ -24,6 +26,7 @@ from MazakFiles import (LoginErrorExcpetion,
 
 POLLING = False  # Connecting to telegram using polling if true or webhook if false
 LOG_FILE = "log"
+NUM_THREADS = 256
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -174,10 +177,23 @@ def choose_department(bot, update, user_data):
     return GRADES_SHEET
 
 
+def download_grades_sheet(update, user_data, filename, lang):
+    notebook_file = io.BytesIO(
+        get_grade_sheet(log_to_mazak(user_data["username"],
+                                     user_data["password"]),
+                        user_data["dept_code"],
+                        lang))
+    update.message.reply_document(notebook_file,
+                                  filename=filename,
+                                  timeout=200,
+                                  one_time_keyboard=True)
+    del notebook_file
+
+
+@run_async
 def grades_sheet(bot, update, user_data):
     user = update.message.from_user
     lang = update.message.text
-    lang_name = lang
     if lang == "אנגלית":
         lang = 1
         lang_name = "Grades Sheet"
@@ -185,13 +201,13 @@ def grades_sheet(bot, update, user_data):
         lang = 0
         lang_name = "גליון ציונים"
     filename = "{} - {}.pdf".format(lang_name, str(datetime.today()).split()[0])
-    bot.send_chat_action(chat_id=update.effective_message.chat_id,
-                         action=ChatAction.UPLOAD_DOCUMENT,
-                         timeout=60)
-    notebook_file = io.BytesIO(
-        get_grade_sheet(log_to_mazak(user_data["username"], user_data["password"]), user_data["dept_code"], lang))
-    update.message.reply_document(notebook_file, filename=filename, timeout=200,
-                                  one_time_keyboard=True)
+    t = threading.Thread(target=download_grades_sheet, args=(update, user_data, filename, lang))
+    t.start()
+    while t.is_alive():
+        bot.send_chat_action(chat_id=update.effective_message.chat_id,
+                             action=ChatAction.UPLOAD_DOCUMENT,
+                             timeout=60)
+        t.join(5)
     popup_choosing_keyboard(update, get_choosing_keyboard())
     return CHOOSING
 
@@ -209,6 +225,18 @@ def get_grades_keyboard(user_data):
     return reply_keyboard
 
 
+def download_notebook(update, user_data, filename, notebook):
+    notebook_file = io.BytesIO(get_notebook(log_to_mazak(user_data["username"], user_data["password"]), notebook["id"]))
+    update.message.reply_document(notebook_file,
+                                  filename=filename,
+                                  timeout=999,
+                                  reply_markup=ReplyKeyboardMarkup(
+                                      get_notebooks_keyboard(user_data),
+                                      one_time_keyboard=True))
+    del notebook_file
+
+
+@run_async
 def notebooks(bot, update, user_data):
     user = update.message.from_user
     course = update.message.text
@@ -219,13 +247,13 @@ def notebooks(bot, update, user_data):
     notebook = [item for item in user_data["notebooks"] if
                 "{} - {}".format(item["courseName"], item["testTimeTypeName"]) == course][0]
     filename = "{} - {}".format(notebook["courseName"], notebook["testTimeTypeName"]) + ".pdf"
-    bot.send_chat_action(chat_id=update.effective_message.chat_id,
-                         action=ChatAction.UPLOAD_DOCUMENT,
-                         timeout=60)
-    notebook_file = io.BytesIO(get_notebook(log_to_mazak(user_data["username"], user_data["password"]), notebook["id"]))
-    update.message.reply_document(notebook_file, filename=filename, timeout=200,
-                                  reply_markup=ReplyKeyboardMarkup(get_notebooks_keyboard(user_data),
-                                                                   one_time_keyboard=True))
+    t = threading.Thread(target=download_notebook, args=(update, user_data, filename, notebook))
+    t.start()
+    while t.is_alive():
+        bot.send_chat_action(chat_id=update.effective_message.chat_id,
+                             action=ChatAction.UPLOAD_DOCUMENT,
+                             timeout=60)
+        t.join(5)
     return NOTEBOOKS
 
 
@@ -334,7 +362,7 @@ def send_restart(updater):
 
 def main():
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(TOKEN)
+    updater = Updater(TOKEN, workers=NUM_THREADS)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
