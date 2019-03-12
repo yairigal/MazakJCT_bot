@@ -192,7 +192,7 @@ def download_grades_sheet(update, user_data, filename, lang):
                         lang))
     update.message.reply_document(notebook_file,
                                   filename=filename,
-                                  timeout=200,
+                                  timeout=9999999,
                                   one_time_keyboard=True)
 
 
@@ -236,7 +236,7 @@ def download_notebook(update, user_data, filename, notebook):
     notebook_file.seek(0)
     update.message.reply_document(notebook_file,
                                   filename=filename,
-                                  timeout=999,
+                                  timeout=999999,
                                   reply_markup=ReplyKeyboardMarkup(
                                       get_notebooks_keyboard(user_data),
                                       one_time_keyboard=True))
@@ -425,7 +425,8 @@ def webhook(updater):
     updater.start_webhook(listen='127.0.0.1',
                           port=PORT,
                           url_path=URL_PATH + TOKEN)
-    updater.bot.set_webhook(url=BASE_URL + URL_PATH + TOKEN)
+    updater.bot.set_webhook(url=BASE_URL + URL_PATH + TOKEN,
+                            max_connections=100)
 
 
 if __name__ == '__main__':
