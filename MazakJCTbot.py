@@ -5,7 +5,6 @@ import logging
 import threading
 from functools import wraps
 from datetime import datetime
-from time import sleep
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove, ChatAction)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, run_async)
@@ -24,9 +23,17 @@ from MazakFiles import (LoginErrorExcpetion,
                         get_departments,
                         get_grade_sheet)
 
-POLLING = False  # Connecting to telegram using polling if true or webhook if false
-LOG_FILE = "log"
-NUM_THREADS = 256
+CONFIG_FILE = "config.json"
+with open(CONFIG_FILE, "r", encoding='utf8') as config_file:
+    configs = json.load(config_file)
+
+POLLING = configs['polling']  # Connecting to telegram using polling if true or webhook if false
+LOG_FILE = configs['log_file_name']
+NUM_THREADS = configs['num_threads']
+RESTART_MSG = configs['restart_msg']
+PORT = configs['port']
+BASE_URL = configs['base_url']
+URL_PATH = configs['url_path']
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -187,7 +194,6 @@ def download_grades_sheet(update, user_data, filename, lang):
                                   filename=filename,
                                   timeout=200,
                                   one_time_keyboard=True)
-    del notebook_file
 
 
 @run_async
@@ -227,13 +233,13 @@ def get_grades_keyboard(user_data):
 
 def download_notebook(update, user_data, filename, notebook):
     notebook_file = io.BytesIO(get_notebook(log_to_mazak(user_data["username"], user_data["password"]), notebook["id"]))
+    notebook_file.seek(0)
     update.message.reply_document(notebook_file,
                                   filename=filename,
                                   timeout=999,
                                   reply_markup=ReplyKeyboardMarkup(
                                       get_notebooks_keyboard(user_data),
                                       one_time_keyboard=True))
-    del notebook_file
 
 
 @run_async
@@ -350,12 +356,11 @@ def error(bot, update, error):
 
 
 def send_restart(updater):
-    restart_msg = "היי !    \nחזרנו לעבוד אנא שלח /start כדי להתחיל !"
     with open("contacts", 'r') as f:
         ppl = json.load(f)
     for id in ppl.keys():
         try:
-            updater.bot.sendMessage(int(id), restart_msg)
+            updater.bot.sendMessage(int(id), RESTART_MSG)
         except:
             pass
 
@@ -417,8 +422,10 @@ def polling(updater):
 
 
 def webhook(updater):
-    updater.start_webhook(listen='127.0.0.1', port=5003, url_path='bots/' + TOKEN)
-    updater.bot.set_webhook(url='https://nmontag.com/bots/' + TOKEN)
+    updater.start_webhook(listen='127.0.0.1',
+                          port=PORT,
+                          url_path=URL_PATH + TOKEN)
+    updater.bot.set_webhook(url=BASE_URL + URL_PATH + TOKEN)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,9 @@
+{
+  "polling": false,
+  "log_file_name": "log",
+  "num_threads": 256,
+  "restart_msg": "היי!\nחזרנו לעבוד אנא שלח /start כדי להתחיל!\nהבוט עולה ויורד לתיקונים במטרה לשפר את פעולתו",
+  "base_url": "https://nmontag.com/",
+  "url_path": "bots/",
+  "port": 5003
+}
